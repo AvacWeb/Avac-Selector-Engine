@@ -73,9 +73,7 @@ What would be best would be getting the SPANS's first and *then* checking if the
 This example isn't great since it wouldn't make much speed difference. But there can be occasions.  
 Which is why this selector engine allows you to change the priority of how things are dealt with. By specifying it in an array as the third parameter.
 
-```javascript
-$avac('#test span.test', false, ['tag','class','attr']);
-```
+`$avac('#test span.test', false, ['tag','class','attr'])`   
 Doing this means it will get the SPANS first then filter the classnames then filter the attributes.  
 Hence executing and returning the nodes faster.   
 
