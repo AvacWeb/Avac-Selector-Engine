@@ -1,7 +1,7 @@
 Avac Selector Engine 
 ===============================
 
-This is basically the same as the rest of them, a CSS Selector Engine, but its also pretty fast and lightweight.  
+This is basically the same as the rest of them, a CSS Selector Engine, but its also very fast and lightweight.  
 Try it out, you might like it.
 
 ```javascript
@@ -79,5 +79,11 @@ Hence executing and returning the nodes faster.
 The default order is 'tag','class','attr'
 Specifying any less or more than 3 will result in it not being set. Specifying any other words will result in it likely breaking the script. So be wise haha.   
 
-So yeah enjoy :)
-The list above of what is supported will be updated every now and then when things have been updated obviously.
+#### Other notes I'd like to make
+* querySelectorAll is supported.
+* Like explained above, multi tokens will be prioritised and take the predicted fastest path, which is currently making this selector engine nice and fast.
+* The selector engine supports a range of browsers but not as much as the likes of Sizzle. Any suggestions or improvements for browser support would be good.
+* There are shortcuts in the script for optimization. SUCH AS when the specified attribute is 'href' it will only get A tags. 
+* Another is when the specified attribute is 'name' it will check getElementsByName support and use that.
+* The third parameter can actually make a massive difference. It may not seem like it, but it can do. use it wisely, this is something no other selector has provided.
+* The list above of what is supported will be updated every now and then when things have been updated obviously.
