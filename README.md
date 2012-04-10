@@ -51,16 +51,16 @@ The engine will instead take the className as the higher priority. This means it
 
 However, you may be in a situation where this isn't great. I'll demonstrate with an example, take this HTML: 
 ```html   
-<div id="test">    
-  <div class="test"></div>    
-  <div></div>   
-  <div></div> 
-  <div></div>
-  <div></div>  
-  <span class="test"></span>   
-  <span class="test"></span>     
-</div> 
-```   
+    <div id="test">    
+      <div class="test"></div>    
+      <div></div>   
+      <div></div> 
+      <div></div>
+      <div></div>  
+      <span class="test"></span>   
+      <span class="test"></span>     
+    </div> 
+````   
 
 And this selector: '#test div.test'  
 The selector engine when it comes to div.post it will normally find all elements with classname of 'test' first.   
