@@ -87,4 +87,3 @@ Specifying any less or more than 3 will result in it not being set. Specifying a
 * Another is when the specified attribute is 'name' it will check getElementsByName support and use that.
 * The third parameter can actually make a massive difference. It may not seem like it, but it can do. use it wisely, this is something no other selector has provided.
 * The list above of what is supported will be updated every now and then when things have been updated obviously.
-* Use as jQuery plug in `$.fn.avac=$avac`
