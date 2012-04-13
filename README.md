@@ -22,7 +22,7 @@ Here's a list of things already done, and what I plan on adding.
 
 ###### Still to add.
 * previous sibling selector '~'
-* :first-Child
+* :first-child
 * :first-of-type
 * :last-of-type
 * :only-of-type
@@ -30,8 +30,7 @@ Here's a list of things already done, and what I plan on adding.
 * :last-child
 * :empty
 * :not()
-* :first
-* :last
+
 ... I'll probably not do anything else. I hate nth-of-type and such things lol.
 
 
