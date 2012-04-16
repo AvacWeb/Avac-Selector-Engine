@@ -7,47 +7,43 @@
 */
 
 (function(){
-var $avac = function(selector, context, new_priority) {
+var avac = function(selector, context, new_priority) {
 	if(!selector || selector == '' || selector==' ') return;
-	
-	//we'll take a shortcut if there is an ID anywhere in the selector. 
-	//this CAN cause issues though. eg. '.hello #goodbye', if #goodbye does not exist inside '.hello'. #goodbye will still be returned.
-	//But people shouldn't be using stupid selectors like that for ID's.
+
+	//cut off all before any ID's. Go straight to id.
 	if(selector.indexOf('#')!=-1) {
 		selector = selector.substring(selector.lastIndexOf('#'));
 	}
 	
+	//sort context out.
 	if(context) {
 		//if its a string, we'll assume its a selector.
 		if(typeof context === 'string')	context = $avac(context);
 		//it should be an object now. 
 		if(typeof context === 'object') {
 			//cur_context needs to be an array, not node collection. Check for concat.
-			cur_context = ('concat' in context) ? context : 
+			var cur_context = ('concat' in context) ? context : 
 			//not contact, so could be an element object or a node collection.
 						  ('tagName' in context) ? [context] : Array.prototype.slice.call(context);
 		}
+		else{
+			var cur_context = [document]
+		}
 	}
 	else {
-		cur_context = [document]
+		var cur_context = [document]
 	}
-	  
-	//regex for creating the chunks. Here's how it is split:
-	// selector: '.post[href] div.post[href="hi there"] > div [href] [href][attr]'
-	// chunks: [ .post,[href], ,div,.post,[href="hi there"], ,>, ,div, ,[href], ,[href],[attr] ]
-	var chunky = /(?:#[^\>\+\.\s\[:]+)|(?:\.[^\>\+\.\s\[:]+)|(?:\[\w+(?:[\$\*\^!]?=["'][\w\s]+["'])?\])|(?:[\>\+])|\w+|\s/g;
 	
+	var chunky = /(?:#[^\>\+\.\s\[:]+)|(?:\.[^\>\+\.\s\[:]+)|(?:\[\w+(?:[\$\*\^!]?=["'][\w\s]+["'])?\])|(?:[\>\+])|\w+|\s|(?::[\w-]+)/g;
+	//split the selector up into manageable chunks.
 	var chunks = selector.match(chunky)
 	, that = this
-	, direct_child = false
-	, direct_sibling = false
 	, jumping = true
 	, previousNodes = cur_context
-	, previousSelector = ''
-	, previousIdentifier = ''
-	, selectorStorage = []
+	, selectorStorage = []	//stores in parts of a selector which is all one. Like div.post
 	, ordering;
 	
+	//if QSA is supported, perform QSA on all context elems.
 	if(document.querySelectorAll) {
 		var ret = [];
 		for(var ci=0,cl=cur_context.length; ci<cl; ci++) {
@@ -57,10 +53,11 @@ var $avac = function(selector, context, new_priority) {
 	}
 	
 	if(new_priority && new_priority.length == 3) {
-		ordering = ['sibling','child',new_priority[0],new_priority[1],new_priority[2]]
+		ordering = ['sibling','child',new_priority[0],new_priority[1],new_priority[2],'pseudo']
 	} 
 	else {
-		ordering = ['child','sibling','class','tag','attr']
+		//default priority ordering.
+		ordering = ['child','sibling','class','tag','pseudo','attr']
 	}
 
 	//the possibilities of what each chunk could be.
@@ -70,7 +67,8 @@ var $avac = function(selector, context, new_priority) {
 		'tag': /^[^\>\+\.\s\[:="']+$/,
 		'child': /^\>$/,
 		'attr': /^(?:\[\w+(?:[\$\*\^!]?=["'][\w\s]+["'])?\])$/,  
-		'sibling': /^\+$/
+		'sibling': /^\+$/,
+		'pseudo' : /^:(?:first|last|only(?:-of-type|-child))|empty|not\(.*\)$/
 	};
     
 	//when sent a chunk, it will return the type of selector in word form, to then perform the necessary actions.
@@ -78,9 +76,10 @@ var $avac = function(selector, context, new_priority) {
 		for(var type in that.possibles) {
 			if (that.possibles[type].test(sel)) return type;
 		}
-		throw new Error('Invalid Selector: "'+sel+'"');
+		return false;
 	};
 	
+	//return elements by classname. 
 	this.byClass = function(elem,classname) {
 		if(elem.getElementsByClassName) {
 			return Array.prototype.slice.call(elem.getElementsByClassName(classname));
@@ -95,6 +94,7 @@ var $avac = function(selector, context, new_priority) {
 		}
 	};
 	
+	//return elements by attribute, via performing a confirming function on the attribute.
 	this.byAttr = function(elem,attr,fn) {
 		var ret = [], arr = elem.all ? elem.all : elem.getElementsByTagName('*'), value = attr.value, attrname = attr.name;
 		
@@ -105,7 +105,7 @@ var $avac = function(selector, context, new_priority) {
 										
 		for (var i=0,l=arr.length; i<l; i++) {
 			var a=arr[i].getAttribute(attrname);
-			if(a) fn(a) ? ret.push(arr[i]) : 0;
+			if(a && fn(a)) ret.push(arr[i]);
 		}
 		return ret;
 	};
@@ -126,14 +126,14 @@ var $avac = function(selector, context, new_priority) {
 		return (info.condition === '=') ?
 			function(attrvalue) { return (attrvalue === info.value) }
 			: info.condition === '^=' ?
-				function(attrvalue){ return (attrvalue.indexOf(info.value) === 0)  }
-				: info.condition === '$=' ?
-					function(attrvalue){ var r=new RegExp(info.value+'$'); return r.test(attrvalue); }
-					: info.condition === '*=' ?
-						function(attrvalue){ return (attrvalue.indexOf(info.value)!=-1) }
-						: info.condition === '!=' ?
-							function(attrvalue){ return (attrvalue != info.value) }
-							: function(){ return false; };
+			function(attrvalue){ return (attrvalue.indexOf(info.value) === 0)  }
+			: info.condition === '$=' ?
+			function(attrvalue){ var r=new RegExp(info.value+'$'); return r.test(attrvalue); }
+			: info.condition === '*=' ?
+			function(attrvalue){ return (attrvalue.indexOf(info.value)!=-1) }
+			: info.condition === '!=' ?
+			function(attrvalue){ return (attrvalue != info.value) }
+			: function(){ return false; };
 	};
 	
 	this.get = {
@@ -155,8 +155,8 @@ var $avac = function(selector, context, new_priority) {
 	  
 		'attr': function(elem,sel) {
 			var info = that.attrParse(sel), fn;
+			
 			//fn will be the function to perform on the attribute value to decide if this is a match.
-		
 			fn = (info.condition && info.value) ? fn = that.getAttrFn(info) : fn = function() { return true; };
 			return that.byAttr(elem,info,fn);
 		},
@@ -170,9 +170,16 @@ var $avac = function(selector, context, new_priority) {
 				if(elem.nodeType==1) return [elem];
 			}
 			return [];
+		},
+		
+		'pseudo' : function(elem, sel) {
+			sel = sel.substr(1);
+			return that.pseudo_get[sel](elem);
 		}
 	};
 	
+	//loops through all the contexts performing a function. 
+	//the function should return nodes.
 	this.context_loop = function(fn) {
 		var arr = cur_context, l = cur_context.length, ret = [];
 		for(var i = 0; i<l; i++) {
@@ -182,6 +189,8 @@ var $avac = function(selector, context, new_priority) {
 		return ret;
 	};
     
+	//filters nodes in order to match more than one rule.
+	//fn should be a function to perform on each node, returning true if it matches the rule.
 	this.filter_function = function(fn) {
 		var loop_arr = previousNodes, ret = [], ll=loop_arr.length;
 		for(var i=0,ll=loop_arr.length; i<ll; i++) {
@@ -220,13 +229,76 @@ var $avac = function(selector, context, new_priority) {
 		'sibling' : function() {
 			return that.filter_function(function(elem) {
 				var prev = elem.previousSibling;
-				while(prev.nodeType != 1) {
+				while(prev && prev.nodeType != 1) {
 					prev = prev.previousSibling;
 				}
 				return (previousNodes.indexOf(prev) != -1 );
 			});
+		},
+		
+		'pseudo' : function(sel) {
+			sel = sel.substr(1);
+			return that.filter_function(function(elem) {
+				return that.pseudo_filter[sel](elem);
+			});
 		}
 	};
+	
+	//determines whether an element matches the pseudo rule. 
+	this.pseudo_filter = {
+		'first-child' : function(elem) {
+			while(elem = elem.previousSibling) {
+				if(elem.nodeType == 1) return false;
+			}
+			return true;
+		},
+		
+		'last-child' : function(elem) {
+			while(elem = elem.nextSibling) {
+				if(elem.nodeType == 1) return false;
+			}
+			return true;
+		},
+		
+		'only-child' : function(elem) {
+			var siblings = elem.parentNode.childNodes;
+			for(var i = 0, end = siblings.length; i<end; i++) {
+				if(siblings[i].nodeType == 1 && siblings[i] != elem) return false;
+			}
+			return true;
+		}
+	};
+	
+	this.pseudo_get = {
+		//to get all first children, get all elements, and filter using internal filters to see if they are a first child.
+		'first-child' : function(elem) {
+			var arr = elem.all ? elem.all : elem.getElementsByTagName('*'), ret = [];
+			for(var i=0, end = arr.length; i<end; i++) {
+				if(that.pseudo_filter['first-child'](arr[i])) ret.push(arr[i]);
+			}
+			return ret;
+		},
+		
+		'last-child' : function(elem) {
+			var arr = elem.all ? elem.all : elem.getElementsByTagName('*'), ret = [];
+			for(var i=0, end = arr.length; i<end; i++) {
+				if(that.pseudo_filter['last-child'](arr[i])) ret.push(arr[i]);
+			}
+			return ret;
+		},
+		
+		'only-child' : function(elem) {
+			var arr = elem.all ? elem.all : elem.getElementsByTagName('*'), ret = [];
+			for(var i=0, end = arr.length; i<end; i++) {
+				if(that.pseudo_filter['only-child'](arr[i])) ret.push(arr[i]);
+			}
+			return ret;
+		}
+	};
+	
+	//attempt to identify the selector, to see if its a single token.
+	var quick_identify = this.identify(selector);
+	if(quick_identify) return this.context_loop(function(elem){ return this.get[quick_identify](elem,selector); });
 	
 	//when we are storing a (what I'm calling) MultiToken (eg div.post) this function will prioritise the order to execute it.
 	//rather than finding all div's and checking if they have the class 'post'. Find all '.posts' and check if they're a div. 
@@ -251,7 +323,7 @@ var $avac = function(selector, context, new_priority) {
 			return that.get[priority_order[1]](elem,priority_order[0]);
 		});
 		
-		//now lets filter the results to make sure the match all the others.
+		//now lets filter the results to make sure the match all the others. With our div.post example, this would now be checking they are divs.
 		for(var i=2,ll=priority_order.length; i<ll; i++) {
 			var token = priority_order[i];
 			i++;
@@ -268,6 +340,7 @@ var $avac = function(selector, context, new_priority) {
 		}
 		else {
 			var action = this.identify(chunks[i]); //returns a string such as 'tag' or 'class'. 
+			if(!action) throw new Error('Invalid Selector: "'+sel+'"');
 			if(jumping) {			
 				
 				//if we've stored a token, then now lets prioritise and execute it.
@@ -304,8 +377,6 @@ var $avac = function(selector, context, new_priority) {
 				//eg div.post  - We will store each part of this single token, and then decide the fastest way.
 				selectorStorage.push(chunks[i])
 				selectorStorage.push(action);
-				
-				//previousNodes = this.filter[action](chunks[i]);
 			}
 			
 			if(chunks[i+1] && chunks[i+1] != ' ' && chunks[i+1]!='>' && chunks[i+1]!='+') {
@@ -315,8 +386,6 @@ var $avac = function(selector, context, new_priority) {
 				jumping = true;
 			}
 		}
-		previousSelector = chunks[i];
-		previousIdentifier = action;
 	}
 	
 	//before returning, we may have a stored token to do, so lets do that.
@@ -324,5 +393,5 @@ var $avac = function(selector, context, new_priority) {
 	
   return previousNodes;
   }
-  window.$avac = $avac;
+  window.$avac = avac;
 })();
