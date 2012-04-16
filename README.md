@@ -22,12 +22,9 @@ Here's a list of things already done, and what I plan on adding.
 
 ###### Still to add.
 * previous sibling selector '~'
-* :first-child
 * :first-of-type
 * :last-of-type
 * :only-of-type
-* :only-child
-* :last-child
 * :empty
 * :not()
 
