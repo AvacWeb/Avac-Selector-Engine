@@ -12,28 +12,28 @@ Documentation
 -------------
 #### What CSS Selectors can I use?
 This selector engine doesn't have all the selectors of the likes of Sizzle(jQuery) but it has everything you'll need at least.  
-Who really uses all these rediculous pseudo selectors? Not me. And this is for me ... mostly.
-* ID's.   
-* Classnames.  
-* TagNames.  
-* direct child selector '>'  
-* Next sibling selector '+'  
-* Attributes. Can have optional value. Supports conditions: '*=' '^=' '$=' and '!='   
-* :first-child, :last-child, :only-child pseudo selectors.
-* :not(selector) matches elements not matching the selector. .nav:not(div) matches .nav's that are not divs.   
-* :has(selector) matches elements that have descendants matching selector. :has(div) , all elements that have divs.
+Who really uses all these rediculous pseudo selectors? Not me. And this is for me ... mostly.    
+* ID's.    
+* Classnames.    
+* TagNames.    
+* direct child selector '>'    
+* Next sibling selector '+'    
+* Attributes. Can have optional value. Supports conditions: '*=' '^=' '$=' and '!='     
+* :first-child, :last-child, :only-child pseudo selectors.    
+* :not(selector) matches elements not matching the selector. .nav:not(div) matches .nav's that are not divs.     
+* :has(selector) matches elements that have descendants matching selector. :has(div) , all elements that have divs.   
 
 ####What can I not use?
-* sibling selector '~'
-* all the horrible -of-type selectors.
-* All the daft jQuery :button,:input selectors.
-* :empty
-* and all the horrible nth-of-type and things.
+* sibling selector '~'   
+* all the horrible -of-type selectors.   
+* All the daft jQuery :button,:input selectors.   
+* :empty   
+* and all the horrible nth-of-type and things.   
 
 ####What can I expect to see in the future?
-* MAYBE sibling selector '~'   
-* MAYBE :empty pseudo class.
-* MAYBE a :nothas() selector since no one has done it I don't think.
+* MAYBE sibling selector '~'     
+* MAYBE :empty pseudo class.   
+* MAYBE a :nothas() selector since no one has done it I don't think.   
 
 
 #### Context Parameter   
