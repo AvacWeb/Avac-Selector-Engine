@@ -51,7 +51,8 @@ So for example with 'div.content' instead of getting all the DIV tags, and going
 The engine will instead take the className as the higher priority. This means it will get the elements with className 'class' and check if they're a div. So we're noy looping through loads of elements. 
 
 However, you may be in a situation where this isn't great. I'll demonstrate with an example, take this HTML: 
-            <div id="test">       
+            <div id="test"> 
+            
                 <div class="test"></div>   
                 <div class="test"></div>     
                 <div class="test"></div>   
