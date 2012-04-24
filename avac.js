@@ -5,8 +5,18 @@
 * All Right Reserved.
 * No unauthorized distrubution or copying.
 */
-
 (function(){
+	//adding indexOf array method if not supported.
+	if (!Array.indexOf) {
+		Array.prototype.indexOf = function(obj) {
+			for (var i = 0, l = this.length; i < l; i++) {
+				if (this[i] === obj) return i;
+			}
+			return -1;
+		};
+	}
+	
+	
 var avac = function(selector, context, new_priority, id_safety) {
 	if(!selector || selector == '' || selector==' ') return;
 
@@ -42,7 +52,7 @@ var avac = function(selector, context, new_priority, id_safety) {
 	, ordering;
 	
 	//if QSA is supported and the selector is valid for QSA, perform QSA on all context elems.
-	if(!/:not\(|:has\(/.test(selector) && document.querySelectorAll) {
+	if(!/.*:(?:not|has)\(.*/.test(selector) && document.querySelectorAll) {
 		var ret = [];
 		for(var ci=0,cl=cur_context.length; ci<cl; ci++) {
 			ret = ret.concat( Array.prototype.slice.call( cur_context[ci].querySelectorAll(selector) ) );
@@ -170,9 +180,9 @@ var avac = function(selector, context, new_priority, id_safety) {
 		'pseudo' : function(elem, sel) {
 			sel = sel.substr(1);
 			origsel = sel;
-			if(/has|not|contains\(.*\)/.test(sel)) {
+			if(/(?:has|not)\(.*\)/.test(sel)) {
 				sel = sel.substring(0,sel.indexOf('(')); //cheap and tacky, but what the hell.
-				origsel = origsel.replace(/(?:has|not|contains)\((.*)\)/,'$1').replace(/^['"]/,'').replace(/['"]$/,'');
+				origsel = origsel.replace(/(?:has|not)\((.*)\)/,'$1').replace(/^['"]/,'').replace(/['"]$/,'');
 			}
 			return that.pseudo_get[sel](elem, origsel);
 		}
@@ -232,9 +242,9 @@ var avac = function(selector, context, new_priority, id_safety) {
 		'pseudo' : function(sel) {
 			sel = sel.substr(1);
 			origsel = sel;
-			if(/has|not|contains\(.*\)/.test(sel)) {
+			if(/(?:has|not)\(.*\)/.test(sel)) {
 				sel = sel.substring(0,sel.indexOf('(')); //cheap and tacky, but what the hell.
-				origsel = origsel.replace(/(?:has|not|contains)\((.*)\)/,'$1').replace(/^['"]/,'').replace(/['"]$/,'');
+				origsel = origsel.replace(/(?:has|not)\((.*)\)/,'$1').replace(/^['"]/,'').replace(/['"]$/,'');
 			}
 			return that.filter_function(function(elem) {
 				return that.pseudo_filter[sel](elem, origsel);
@@ -267,11 +277,11 @@ var avac = function(selector, context, new_priority, id_safety) {
 		},
 		
 		'has' : function(elem, sel) {
-			return ( $avac(sel, elem).length > 0 )
+			return ( $avac(sel, elem, 0, id_safety).length > 0 )
 		},
 		
 		'not' : function(elem, sel) {
-			return ( $avac(sel,elem.parentNode).indexOf(elem) === -1 );
+			return ( $avac(sel,elem.parentNode, 0, id_safety).indexOf(elem) === -1 );
 		}
 	};
 	
@@ -353,7 +363,7 @@ var avac = function(selector, context, new_priority, id_safety) {
 			continue;
 		}
 		else {
-			var action = this.identify(chunks[i]); //identify this chunk. 
+			var action = this.identify(chunks[i]); //identify this chunk.
 			if(!action) throw new Error('Invalid Selector: "'+sel+'"');
 			
 			if(jumping) {			
@@ -393,7 +403,7 @@ var avac = function(selector, context, new_priority, id_safety) {
 	}
 	if(selectorStorage.length) this.multiToken();
 	
-  return nodes;
+  	return nodes;
   }
   window.$avac = avac;
 })();
