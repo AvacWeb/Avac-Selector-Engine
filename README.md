@@ -91,3 +91,4 @@ If you wish for the selector not to be cut, set the fourth parameter as true.
 * Another is when the specified attribute is 'name' it will check getElementsByName support and use that.
 * The third parameter can actually make a massive difference. It may not seem like it, but it can do. use it wisely, this is something no other selector has provided.
 * Will I ever offer an API for adding more pseudo's or selectors? Probably not. If you need to add more, your doing something wrong IMO.
+* IE support: Supports 7,8,9 didnt test any earlier. 
