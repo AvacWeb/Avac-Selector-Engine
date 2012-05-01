@@ -35,7 +35,7 @@
 
 
 var avac = function(selector, context, new_priority, id_safety) {
-	if(!selector || selector == '' || selector==' ') return;
+	if(!selector || selector == '' || selector==' ') return;	
 
 	//cut off all before any ID's. Go straight to id. Unless safety is turned on.
 	if(!id_safety && selector.indexOf('#')!=-1) {
@@ -66,6 +66,7 @@ var avac = function(selector, context, new_priority, id_safety) {
 	, chunks = selector.match(full_chunky)
 	, that = this
 	, jumping = true
+	, first = true
 	, nodes = cur_context
 	, selectorStorage = []	//stores in parts of a selector which is all one. Like div.post
 	, ordering;
@@ -424,5 +425,6 @@ var avac = function(selector, context, new_priority, id_safety) {
 
   	return nodes;
   }
+  
   window.$avac = avac;
 })();
