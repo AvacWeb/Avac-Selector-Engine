@@ -48,6 +48,5 @@ A string will be assumed as a another selector. `$avac('div.content',document.ge
 * The selector engine supports a range of browsers but not as much as the likes of Sizzle. Any suggestions or improvements for browser support would be good.
 * There are shortcuts in the script for optimization. SUCH AS when the specified attribute is 'href' it will only get A tags. 
 * Another is when the specified attribute is 'name' it will check getElementsByName support and use that.
-* The third parameter can actually make a massive difference. It may not seem like it, but it can do. use it wisely, this is something no other selector has provided.
-* Will I ever offer an API for adding more pseudo's or selectors? Probably not. If you need to add more, your doing something wrong IMO.
+* Will I ever offer an API for adding more pseudo's or selectors? Probably not. I find there is enough for my needs.
 * IE support: Supports 7,8,9 didnt test any earlier. 
