@@ -6,380 +6,306 @@
 * No unauthorized distrubution or copying.
 */
 (function(){
-	//adding indexOf array method if not supported.
-	if (!Array.prototype.indexOf) {
+	if (![].indexOf) {
 		Array.prototype.indexOf = function(obj) {
-			for (var i = 0, l = this.length; i < l; i++) {
-				if (this[i] === obj) return i;
-			}
+			for (var i = 0, l = this.length; i < l; i++) if (this[i] === obj) return i;
 			return -1;
 		};
 	}
 	
-	
-	var Slice; //fix for IE slice bugs.
+	var makeArray //fix for IE slice bugs.
 	try {
-		Array.prototype.slice.call(document.getElementByTagName('head'));
-		
-		Slice = function(item){
-			return Array.prototype.slice.call(item);
-		};
+		Array.prototype.slice.call(document.getElementsByTagName('html'));
+		makeArray = function(item){ return Array.prototype.slice.call(item) };
     } 
 	catch(e) {
-        Slice = function(item){
-            if(item instanceof Object) return  Array.prototype.slice.call(item);
-            for(l=item.length, ret = [], i =0; i<l; i++) ret.push(item[i]);
+        makeArray = function(item){
+            if(item instanceof Object) return Array.prototype.slice.call(item);
+            for(l=item.length, ret = [], i = 0; i<l; i++) ret.push(item[i]);
             return ret;
         };
     };
-
-
-	var avac  = function(selector, context) {
-		if(!selector || /^\s+$/.test(selector) || selector=='') return;
 	
-		if(/^#\w+$/.test(selector)) return [document.getElementById(selector.substr(1))];
-
-		//test for an ID in the middle.
-		var id_test = /^[^'"\(]+(#[^\>\+\.\s\[:]+)/;
-		if(id_test.test(selector)) {
-			var ID = selector.replace(id_test,'$1').replace(/^#([^\>\+\.\s\[:]+).*/,'$1');
-			selector = selector.replace(id_test, '');
-			context = document.getElementById(ID);
+	//split the selector into a manageable array. 
+	function selectorSplit(selector) {
+		var chunky = /(?:#[\w\d_-]+)|(?:\.[\w\d_-]+)|(?:\[\w+(?:[\$\*\^!\|~=]?=["']?.+["']?)?\])|(?:[\>\+~])|\w+|\s|(?::[\w-]+(?:\([^\)]+\))?)/g
+		return selector.match( chunky ) || [];
+	};
+	
+	//identify a chunk. Is it a class/id/tag etc?
+	function identify(chunk) {
+		var possibles = {
+			'id': /^#[^\>\+\.\s\[:]+$/,
+			'class': /^\.[^\>\+\.\s\[:]+$/,
+			'tag': /^[^\>\+\.\s\[:="']+$/,
+			'rel': /^\>|\+|~$/,
+			'attr': /^\[\w+(?:[\$\*\^!\|~]?=["']?.+["']?)?\]$/,  
+			'changer': /^:(?:eq|gt|lt|first|last|odd|even)(?:\(\d+\))?$/,
+			'pseudo' : /^:[\w\-]+(?:\(.+\))?$/,
+			'space' : /^\s+$/
+		};
+		for(var type in possibles) {
+			if (possibles[type].test(chunk)) return type;
 		}
-		this.Slice = Slice;
-		var cur_context = [document];
-		if(context) {
-			//if its a string, we'll assume its a selector.
-			if(typeof context === 'string') context = $avac(context);
-			if(typeof context === 'object') {
-				var cur_context = ('concat' in context) ? context : 
-				('tagName' in context) ? [context] : this.Slice(context);
-			}
-		}			
-
-		var chunky1 = /(?:#[^\>\+\.\s\[:]+)|(?:\.[^\>\+\.\s\[:]+)|(?:\[\w+(?:[\$\*\^!]?=["'][\w\s]+["'])?\])/
-		, chunky2 = /(?:[\>\+])|\w+|\s|(?::[\w-]+(?:\([^\)]+\))?)/
-		, full_chunky = new RegExp(chunky1.source+'|'+chunky2.source,'g')
-		, chunks = selector.match(full_chunky)
-		, that = this
-		, jumping = true
-		, first = true
-		, nodes = cur_context
-		, selectorStorage = []	//stores in parts of a selector which is all one. Like div.post
-		, ordering = ['child','sibling','class','tag','pseudo','attr'];				
-
-		//if QSA is supported and the selector is valid for QSA, perform QSA on all context elems.
-		if(!/.*:(?:not|has)\(.*/.test(selector) && document.querySelectorAll) {
-			var ret = [], ci = 0, cl = cur_context.length;
-			for(var ci=0,cl=cur_context.length; ci<cl; ci++) {
-				ret = ret.concat( this.Slice( cur_context[ci].querySelectorAll(selector) ) );
-			}
-			return ret;
+		return false;
+	};
+	
+	//check for QSA compatibility.
+	function QSA(selector) {
+		if(!document.querySelectorAll) return false;
+		try {
+			document.querySelectorAll(selector);
+			return window.Element.prototype.querySelectorAll;
 		}
-   	 
-		//identify a chunk.
-		this.identify = function(sel) {
-			var possibles = {
-				'id': /^#[^\>\+\.\s\[:]+$/,
-				'class': /^\.[^\>\+\.\s\[:]+$/,
-				'tag': /^[^\>\+\.\s\[:="']+$/,
-				'child': /^\>$/,
-				'attr': /^(?:\[\w+(?:[\$\*\^!]?=["'][\w\s]+["'])?\])$/,  
-				'sibling': /^\+$/,
-				'pseudo' : /^:(?:(?:first|last|only(?:-of-type|-child))|empty|(?:not|has|contains)\(.*\))$/
-			};
-			
-			for(var type in possibles) {
-				if (possibles[type].test(sel)) return type;
-			}
-			return false;
-		};				
-
-		//return elements by classname. 
-		this.byClass = function(elem, classname) {
-			if(elem.getElementsByClassName) {
-				return that.Slice(elem.getElementsByClassName(classname));
+		catch(e) {
+			return false;	
+		}
+	};
+	
+	//If filter = true, acts as a filter. else acts as a "getter"
+	function arrayCallback(nodes, filter, fn) {
+		for(var i = 0, ret = [], l = nodes.length; i<l; i++ ) {
+			var e = nodes[i];
+			var result = fn( e );
+			if(filter) {
+				if(result) ret.push( e );
 			}
 			else {
-				var arr = elem.all ? elem.all : elem.getElementsByTagName('*'), matches = [];
-				var classTest = new RegExp("(^|\\s)" + classname + "(\\s|$)"), i = 0, l = arr.length;
-				for(; i<l; i++) {
-					if(classTest.test(arr[i].className)) matches.push(arr[i]);
-				}
-				return matches;
+				ret = ret.concat( result );
 			}
-		};			
+		};
+		return ret;
+	};
 
-		//return elements by attribute, via performing a confirming function on the attribute.
-		this.byAttr = function(elem, attr, fn) {
-			var ret = [], arr = elem.all ? elem.all : elem.getElementsByTagName('*'), value = attr.value, attrname = attr.name;					
-			arr = (attrname==='href') ? elem.getElementsByTagName('a') 
-					: (attrname==='name') ? elem.getElementsByName ? value ? elem.getElementsByName(value) : arr : arr : arr;
-			for (var i=0, l=arr.length; i<l; i++) {
-				var a=arr[i].getAttribute(attrname);
-				if(a && fn(a)) ret.push(arr[i]);
+	var $avac = function(selector, context) {	
+		if(!selector || /^\s*$/.test(selector) || !selector.charAt) return;
+		selector = selector.replace(/^\s+|\s+$/, '').replace(/\s?([\+~\>])\s?/g, ' $1'); //trim
+		
+		var nodes = [document];
+		if(context && context.nodeType && context.nodeType == 1) nodes = [context];
+		
+		//will pull out any ID to use for speed. Will avoid ID's inside attribute values or :not|:contains etc.
+		var quickID = /.*(?!(?:\(|\[).*#.+(?:\)|\]))(?:[\w\d]+|\s)#([\w\d_-]+).*/g;
+		if(quickID.test(selector)) {
+			nodes = [ document.getElementById( selector.replace(quickID, '$1') ) ];
+			selector = selector.substr( quickID.lastIndex );
+		};
+
+		if( QSA(selector) ) // QSA compatibility check.
+			return arrayCallback(nodes, false, function(e) { 
+				return makeArray( e.querySelectorAll(selector) );
+			});
+		
+		var chunks = selectorSplit(selector)
+		,	i = 0
+		,	l = chunks.length
+		,	pieceStore = []
+		,	getters = $avac.getters
+		,	filters = $avac.filters
+		,	changers = $avac.changers;
+		
+		chunks = arrayCallback(chunks, false, function(sel) {
+			return [ {text: sel, type: identify(sel)} ];
+		});
+		
+		for(; i<l; i++) {
+			if(nodes.length == 0) return []; //no point carrying on if we run out of nodes.
+			var piece = chunks[i], nextPiece = chunks[i+1];
+			if(!piece.type) throw new Error('Invalid Selector: '+piece.text);
+
+			if(piece.type != 'space' && nextPiece) {
+				pieceStore.push( piece ); //push all pieces into pieceStore until we hit a space or the end.
 			}
-			return ret;
-		};
-	
-		//parses an attribute selector and returns an object containing info.
-		this.attrParse = function(attrsel) {
-			attrsel = attrsel.replace(/^\[/,'').replace(/\]$/,'');
-			var attrname = attrsel.match(/^\w+/)[0], condition = false, attrvalue = false;
-			if(/^\w+[\$\^\*!]?=/.test(attrsel)) {
-				condition = attrsel.match(/[\^\$\*!]?=/)[0];
-				attrvalue = attrsel.substring(attrsel.indexOf(condition)+condition.length);
-				attrvalue = attrvalue.replace(/^['"]/,'').replace(/['"]$/,'');
-			}
-			return { name: attrname, condition: condition, value: attrvalue }
-		};
-	
-		this.getAttrFn = function(info) {
-			return (info.condition === '=') ?
-				function(attrvalue) { return (attrvalue === info.value) }
-				: info.condition === '^=' ?
-				function(attrvalue){ return (attrvalue.indexOf(info.value) === 0)  }
-				: info.condition === '$=' ?
-				function(attrvalue){ return (RegExp(info.value+'$')).test(attrvalue); }
-				: info.condition === '*=' ?
-				function(attrvalue){ return (attrvalue.indexOf(info.value)!=-1) }
-				: info.condition === '!=' ?
-				function(attrvalue){ return (attrvalue != info.value) }
-				: function(){ return false; };
-		};
-	
-		this.getElems = {
-			'id' : function(elem, sel) {
-				return [document.getElementById(sel.substr(1))];
-			},
-			'class': function(elem, sel) {
-				return that.byClass(elem, sel.substr(1));
-			},
-			'tag': function(elem, sel) {
-				return that.Slice(elem.getElementsByTagName(sel));
-			},
-			'attr': function(elem,sel) {
-				var info = that.attrParse(sel), fn;
-				fn = (info.condition && info.value) ? that.getAttrFn(info) : function() { return true; };
-				return that.byAttr(elem, info, fn);
-			},
-			'child' : function(elem, sel) {
-				return elem.firstChild ? that.Slice(elem.childNodes) : [];
-			},
-			'sibling' : function(elem,sel) {
-				if('nextElementSibling' in elem) return elem.nextElementSibling ||  [];
-				while(elem = elem.nextSibling) {
-					if(elem.nodeType==1) return [elem];
-				}
-				return [];
-			},
-			'pseudo' : function(elem, sel) {
-				sel = sel.substr(1);
-				origsel = sel;
-				if(/(?:has|not)\(.*\)/.test(sel)) {
-					sel = sel.substring(0,sel.indexOf('(')); //cheap and tacky, but what the hell.
-					origsel = origsel.replace(/^(?:has|not)\((.*)\)$/,'$1').replace(/(^['"])|(['"]$)/,'');
-				}
-				return that.pseudo_get[sel](elem, origsel);
-			}
-		};
-	
-		this.context_loop = function(fn) {
-			var arr = cur_context, l = cur_context.length, ret = [];
-			for(var i = 0; i<l; i++) {
-				if(arr[i].nodeType!=1 && arr[i].nodeType!=9) continue;
-				ret = ret.concat(fn(arr[i]));
-			}
-			return ret;
-		};
-    	
-		this.filter_function = function(fn) {
-			var loop_arr = nodes, ret = [], ll=loop_arr.length;
-			for(var i=0; i<ll; i++) {
-				if(loop_arr[i].nodeType!=1 && loop_arr[i].nodeType!=9) continue;
-				if(fn(loop_arr[i])) ret.push(loop_arr[i]);
-			}
-			return ret;
-		};
-	
-		this.filters = {
-			'class' : function(sel) {
-				var classTest = new RegExp("(^|\\s)" + sel.substr(1) + "(\\s|$)");
-				return that.filter_function(function(elem) {
-					return (classTest.test(elem.className))
+			else {
+				var piece1 = (piece.type != 'space' && piece.type != 'changer') ? piece : pieceStore.shift(); 				
+				nodes = arrayCallback(nodes, false, function(el) {
+					return getters[ piece1.type ](el, piece1.text);
 				});
-			},
-			'tag' : function(sel) {
-				return that.filter_function(function(elem) {
-					return (elem.tagName.toLowerCase() === sel.toLowerCase()) 
-				});
-			},
-			'attr' : function(sel) {
-				var info = that.attrParse(sel), fn = (info.condition && info.value) ? that.getAttrFn(info) : function() { return true	; };	
-				return that.filter_function(function(elem) {
-					return elem.getAttribute(info.name) ? fn(elem.getAttribute(info.name)) : false;
-				});
-			},
-			'sibling' : function() {
-				return that.filter_function(function(elem) {
+				
+				if(piece.type == 'changer') {
+					var value = piece.text.replace(/[^\(]+\((\d+)\)$/, '$1');
+					var type = piece.text.replace(/^:(\w+).*/, '$1');
+					nodes = changers[type](nodes, value);
+				};
+				
+				if(pieceStore.length) {
+					for( var j = 0, k = pieceStore.length; j<k; j++ ) {
+						nodes = arrayCallback(nodes, true, function(node) {
+							return filters[ pieceStore[j].type ](node, pieceStore[j].text);
+						});
+					}
+					j = 0;
+				};
+				pieceStore = [];
+			}
+		};
+
+		return nodes;
+	}
+	
+	$avac.getters = { 
+		'id' : function(elem, sel) {
+			return elem.getElementById ? [elem.getElementById(sel.substr(1))] : [document.getElementById(sel.substr(1))];
+		},
+		'class': function(elem, sel) {
+			return elem.getElementsByClassName ? makeArray( elem.getElementsByClassName(sel.substr(1)) ) :
+			arrayCallback( elem.all ? elem.all : elem.getElementsByTagName('*'), true, function(e) {
+				return $avac.filters['class'](e, sel);
+			});
+		},
+		'tag': function(elem, sel) {
+			return makeArray( elem.getElementsByTagName(sel) );
+		},	
+		'attr': function(elem, sel) {
+			return arrayCallback( elem.all ? elem.all : elem.getElementsByTagName('*'), true, function(e) {
+				return $avac.filters['attr'](e, sel);
+			});
+		},
+		'rel': function(elem, sel) {
+			if(/\+|~/.test(sel)) elem = elem.parentNode;
+			return arrayCallback(elem.childNodes, true, function(e) {
+				return $avac.filters['rel'](e, sel);
+			});
+		},	
+		'pseudo': function(elem, sel) {
+			return arrayCallback(elem.all ? elem.all : elem.getElementsByTagName('*'), true, function(e) {
+				return $avac.filters['pseudo'](e, sel);
+			});
+		}
+	};
+		
+	$avac.filters = {
+		'id' : function(elem, sel) {
+			return (elem.id && elem.id === sel.substr(1));
+		},	
+		'class' : function(elem, sel) {
+			return (elem.className && (RegExp('(^|\\s)'+sel.substr(1)+'(\\s|$)')).test( elem.className ));
+		},	
+		'tag' : function(elem, sel) {
+			return (elem.tagName && elem.tagName.toLowerCase() === sel.toLowerCase());
+		},	
+		'attr' : function(elem, sel) {
+			sel = sel.replace(/^\[|\]$/g, '');
+			var info = sel.match(/(?:[^\|\^\*\$!~=]+)|(?:[\|\^\*\$!~=]?=)|(?:['"]?.+['"]?$)/g);
+			if(info[2]) info[2] = info[2].replace(/^['"]|['"]$/g, '');
+
+			var attrvalue = elem.getAttribute ? elem.getAttribute(info[0]) : elem.attributes.getNamedItem(info[0]);
+			if(!info[1] || !attrvalue) return (attrvalue);
+				
+			switch(info[1]) {
+				case '==':
+				case '=':
+					return (attrvalue === info[2])
+				case '^=':
+				case '|=':
+					return (attrvalue.indexOf( info[2] ) === 0);
+				case '$=':
+					return (RegExp(info[2]+'$')).test(attrvalue);
+				case '*=':
+				case '~=':
+					return (attrvalue.indexOf( info[2] ) != -1)
+				case '!=':
+					return (attrvalue != info[2])
+			};
+			return false;
+		},	
+		'rel' : function(elem, sel) {
+			switch(sel) {
+				case '+' : 
 					var prev = elem.previousElementSibling || elem.previousSibling;
 					while(prev && prev.nodeType != 1) {
 						prev = prev.previousSibling;
 					}
-					return (nodes.indexOf(prev) != -1 );
-				});
-			},
-			'pseudo' : function(sel) {
-				sel = sel.substr(1);
-				origsel = sel;
-				if(/(?:has|not)\(.*\)/.test(sel)) {
-					sel = sel.substring(0,sel.indexOf('(')); //cheap and tacky, but what the hell.
-					origsel = origsel.replace(/(?:has|not)\((.*)\)/,'$1').replace(/^['"]/,'').replace(/['"]$/,'');
-				}
-				return that.filter_function(function(elem) {
-					return that.pseudo_filter[sel](elem, origsel);
-				});
-			}
-		};
-	
-		//determines whether an element matches the pseudo rule. 
-		this.pseudo_filters = {
-			'first-child' : function(elem) {
-				if(elem.previousElementSibling) return false;
-				while(elem = elem.previousSibling) {
-					if(elem.nodeType == 1) return false;
-				}
-				return true;
-			},
-			'last-child' : function(elem) {
-				if(elem.nextElementSibling) return false;
-				while(elem = elem.nextSibling) {
-					if(elem.nodeType == 1) return false;
-				}
-				return true;
-			},
-			'only-child' : function(elem) {
-				if(elem.previousElementSibling || elem.nextElementSibling) return false;
-				var siblings = elem.parentNode.childNodes;
-				for(var i = 0, end = siblings.length; i<end; i++) {
-					if(siblings[i].nodeType == 1 && siblings[i] != elem) return false;
-				}
-				return true;
-			},
-			'has' : function(elem, sel) {
-				return ( $avac(sel, elem).length > 0 )
-			},
-			'not' : function(elem, sel) {
-				return ( $avac(sel,elem.parentNode).indexOf(elem) === -1 );
-			}
-		};
-	
-		this.pseudo_get = {
-			//to get all first children, get all elements, and filter using internal filters to see if they are a first child.
-			'first-child' : function(elem) {
-				var arr = elem.all ? elem.all : elem.getElementsByTagName('*'), ret = [];
-				for(var i=0, end = arr.length; i<end; i++) {
-					if(that.pseudo_filter['first-child'](arr[i])) ret.push(arr[i]);
-				}
-				return ret;
-			},
-			'last-child' : function(elem) {
-				var arr = elem.all ? elem.all : elem.getElementsByTagName('*'), ret = [];
-				for(var i=0, end = arr.length; i<end; i++) {
-					if(that.pseudo_filter['last-child'](arr[i])) ret.push(arr[i]);
-				}
-				return ret;
-			},
-			'only-child' : function(elem) {
-				var arr = elem.all ? elem.all : elem.getElementsByTagName('*'), ret = [];
-				for(var i=0, end = arr.length; i<end; i++) {
-					if(that.pseudo_filter['only-child'](arr[i])) ret.push(arr[i]);
-				}
-				return ret;
-			},
-			'has' : function(elem, sel) {
-				var arr = elem.all ? elem.all : elem.getElementsByTagName('*'), ret = [];
-				for(var i=0, end = arr.length; i<end; i++) {
-					if(that.pseudo_filter['has'](arr[i], sel)) ret.push(arr[i]);
-				}
-				return ret;
-			},
-			'not' : function(elem, sel) {
-				var arr = elem.all ? elem.all : elem.getElementsByTagName('*'), ret = [];
-				for(var i=0, end = arr.length; i<end; i++) {
-					if(that.pseudo_filter['not'](arr[i], sel)) ret.push(arr[i]);
-				}
-				return ret;
-			}
-		};	
-	
-		//attempt to identify the selector, to see if its a single token. If it is, lets just do it and be done.
-		var quick_identify = this.identify(selector);
-		if(quick_identify) return this.context_loop(function(elem){ return this.getElems[quick_identify](elem,selector); });
-	
-		this.multiToken = function() {
-			var priority_order = [], I;
-			//first we will prioritise it. Aka, put it in order by priority for speed.
-			for(var o=0, ol=ordering.length; o<ol; o++) {
-				while(selectorStorage.indexOf(ordering[o],1) != -1) {
-					I = selectorStorage.indexOf(ordering[o],1);
-					priority_order.push(selectorStorage[I-1]);
-					priority_order.push(selectorStorage[I]);
-					selectorStorage[I] = selectorStorage[I] = null;
-				}
-			}
-			nodes = that.context_loop(function(elem){
-				return that.getElems[priority_order[1]](elem,priority_order[0]);
-			});
-			for(var i=2,ll=priority_order.length; i<ll; i++) {
-				var token = priority_order[i]; i++;
-				nodes = this.filters[priority_order[i]](token);
-			}
-			cur_context = nodes;
-		};	
-	
-		for(var i=0,l=chunks.length; i<l; i++) {
-			cur_context = nodes;
-			if(chunks[i] == ' ') {
-				jumping = true; continue;
-			}
-			else {
-				var action = this.identify(chunks[i]); //identify this chunk.
-				if(!action) throw new Error('Invalid Selector: "'+sel+'"');
-				if(jumping) {			
-					if(selectorStorage.length) {
-						this.multiToken();
+					return (nodes.indexOf(prev) != -1);
+				case '~' :
+					while(elem = elem.previousSibling) {
+						if( nodes.indexOf( elem ) != -1 ) return true;
 					}
-					if(action === 'id') { //lets not carry on if its an ID, lets just do it.
-						nodes = that.getElems['id'](null,chunks[i]);
-					    continue;
-					}
-					else if(action === 'child' || action === 'sibling') {
-						//this will cause the next token to be pushed into selectorStorage rather than executed.
-						i = chunks[i+1] == ' ' ? i+1 : i;
-					}
-					//if the next chunk is part of the same token, then store it.
-					if(chunks[i+1] && chunks[i+1] != ' ' && chunks[i+1]!='>' && chunks[i+1]!='+'){
-						selectorStorage.push(chunks[i])
-						selectorStorage.push(action);
-						jumping = false;
-						continue;
-					}
-					nodes = this.context_loop(function(elem){
-						return that.getElems[action](elem,chunks[i]);
-					});
-					selectorStorage = []; //empty storage
-				}
-				else {
-					selectorStorage.push(chunks[i])
-					selectorStorage.push(action);
-				}
-				jumping = (chunks[i+1] && chunks[i+1] != ' ' && chunks[i+1]!='>' && chunks[i+1]!='+') ? false : true;
-			}
+					return false;
+				case '>' :
+					var parent = elem.parentElement || elem.parentNode;
+					return (nodes.indexOf(parent) != -1);
+			};
+			return false;
+		},	
+		'pseudo' : function(elem, sel) {
+			var info = sel.match(/^:([\w-]+)|\(\s*['"]?(.*)['"]?\s*\)?/g);
+			return $avac.pseudo_filter[info[0].substr(1)](elem, info[1]);
 		}
-		if(selectorStorage.length) this.multiToken();
-  		return nodes;
-  	}
-  
-	window.$avac = avac;
+	};
+		
+	$avac.pseudo_filter = {
+		'first-child' : function(elem, sel) { 
+			while(elem = elem.previousSibling) {
+				if(elem.nodeType == 1) return false;
+			}
+			return true;
+		},
+		'last-child' : function(elem, sel) {
+			while(elem = elem.nextSibling) {
+				if(elem.nodeType == 1) return false;
+			}
+			return true;
+		},
+		'hidden' : function(elem, sel) { 
+			var s = elem.style;
+			return elem.type === 'hidden' || (s && s.display === "none") || (s && s.visibility === 'hidden')
+		},
+		'contains' : function(elem, sel) { 
+			var text = elem.textContent || elem.innerText || elem.innerHTML.replace(/\<\/?[^\>]+>/g, '');
+			return (text.indexOf(sel) != -1 )
+		},
+		'notcontains' : function(elem, sel) { return !this['contains'](elem, sel) },
+		'only-child' : function(elem, sel) { return ( this['first-child'](elem) && this['last-child'](elem) ) },
+		'empty' : function(elem, sel) { return !elem.hasChildNodes() },
+		'not' : function(elem, sel) { return ( $avac.self(sel, elem.parentNode).indexOf(elem) == -1 ) },
+		'has' : function(elem, sel) { return ( $avac.self(sel, elem).length > 0 ) },
+		'nothas' : function(elem, sel) { return !this['has'](elem, sel) },
+		'selected' : function(elem, sel) { return elem.selected; },
+		'visible' : function(elem, sel) { return !this['hidden'](elem) },
+		'input' : function(elem, sel) { return (/input|select|textarea|button/i).test( elem.nodeName ) },
+		'enabled' : function(elem, sel) { return !elem.disabled },
+		'disabled' : function(elem, sel) { return elem.disabled },
+		'checkbox' : function(elem, sel) { return elem.type === 'checkbox' },
+		'text' : function(elem, sel) { return elem.type === 'text' },
+		'header' : function(elem, sel) { return (/h\d/i).test( elem.nodeName ) },
+		'radio' : function(elem, sel) { return elem.type === 'radio' },
+		'checked' : function(elem, sel) { return elem.checked },
+		'parent' : function(elem, sel) { return elem.hasChildNodes() }
+	};
+		
+	$avac.changers = {
+		'eq' : function(arr, digit) { return [ arr[parseInt(digit)] ] },
+		'gt' : function(arr, digit) { return arr.slice(parseInt(digit)) },
+		'lt' : function(arr, digit) { return arr.slice(0, parseInt(digit)) },
+		'first' : function(arr, digit) { return [ arr[0] ] },
+		'last' : function(arr, digit) { return [ arr[a.length-1] ] },
+		'odd' : function(arr, digit, even) {
+			for(var i = even ? 0 : 1, l = arr.length, ret = []; i<l; i++) {
+				ret.push( arr[i] );
+				i++;
+			}
+			return ret;
+		},
+		'even' : function(arr, digit) { return this['odd'](arr, digit, true); }
+	};
+	
+	$avac.self = $avac;
+	$avac.filter = function(nodes, filter) {
+		var type = identify( filter );
+		return arrayCallback(nodes, true, function(e) {
+			return $avac.filters[type](e, filter);
+		});
+	};
+	
+	$avac.match = function(node, sel) {
+		var chunks = selectorSplit( sel );
+		for(var i = 0, l = chunks.length; i<l; i++ ) {
+			var type = identify(chunks[i]);
+			if( !$avac.filters[type](node, chunks[i]) ) return false;
+		}
+		return true;
+	};
+	window.$avac = $avac;
+
 })();
