@@ -100,12 +100,13 @@ This is the opposite of odd. Returning the 1st, 3rd, 5th etc.. (indexes 0, 2, 4)
 These can be swapped around if requested... let me know what you think.
 
 
-#### Context Parameter   
-<<<<<<< HEAD
+Context Parameter     
+----------------------------
 A second parameter (context) is accepted... obviously. It should be an element node only.  `$avac('div.content', document.getElementById('main'))`
 
 
-#### Additional Usage.
+Additional Usage.     
+------------------------------
 * __$avac.match(node, selector)__
 This function can be used to determine if a node matches a selector. 
 
@@ -113,22 +114,9 @@ This function can be used to determine if a node matches a selector.
 This function can be used to filter an array (or html collection) of nodes. The filter parameter should be only a simple selector aka just one part. Eg '.class', '#id', '[attr=value]', and not be something like 'div.class p'. 
 Eg `$avac.filter( document.getElementsByTagName('div'), '.inner');` Will filter all the divs, and return only those matching '.inner'. 
 
-#### Other notes I'd like to make
+Other notes I'd like to make 
+------------------------------------    
 * querySelectorAll is supported if the browser supports it and the selector string can be handled by QSA.
 * The selector engine supports a range of browsers but not as much as the likes of Sizzle. Any suggestions or improvements for browser support would be good. It will support IE7+ However I did not check any earlier. 
 * Will I ever offer an API for adding more pseudo's or selectors? Probably not. If you need to add more, your doing something wrong IMO.
-=======
-A second parameter (context) is accepted... obviously.   
-It can be either an Element Object, an Array of Element Objects, a Node collection object, or a string.   
-A string will be assumed as a another selector. `$avac('div.content',document.getElementById('main'))`
-
-
-#### Other notes I'd like to make
-* querySelectorAll is supported. But not if you use :not() or has() obviously.
-* Like explained above, multi tokens will be prioritised and take the predicted fastest path, which is currently making this selector engine nice and fast.
-* The selector engine supports a range of browsers but not as much as the likes of Sizzle. Any suggestions or improvements for browser support would be good.
-* There are shortcuts in the script for optimization. SUCH AS when the specified attribute is 'href' it will only get A tags. 
-* Another is when the specified attribute is 'name' it will check getElementsByName support and use that.
-* Will I ever offer an API for adding more pseudo's or selectors? Probably not. I find there is enough for my needs.
->>>>>>> 031014478b5ac31dd16b540fd829d4f5d42d2ccc
-* IE support: Supports 7,8,9 didnt test any earlier. 
+* Bug reports/improvements are more than welcome. 
