@@ -120,7 +120,6 @@
 				
 				if(piece.type == 'changer') {
 					var info = piece.text.match(/^:\w+|\s*['"]?(\d+)['"]?\s*?/g);
-					alert(info);
 					nodes = $avac.changers[ info[0] ](nodes, info[1]);
 				};
 				
