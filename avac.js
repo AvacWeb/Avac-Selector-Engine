@@ -35,12 +35,12 @@
 	//identify a chunk. Is it a class/id/tag etc?
 	function identify(chunk) {
 		var possibles = {
-			'id': /^#[^\>\+\.\s\[:]+$/,
-			'class': /^\.[^\>\+\.\s\[:]+$/,
-			'tag': /^[^\>\+\.\s\[:="']+$/,
+			'id': /^#[^\>\+\.\s\[:~]+$/,
+			'class': /^\.[^\>\+\.\s\[:\(~]+$/,
+			'tag': /^[^\>\+\.\s\[:="'\(~]+$/,
 			'rel': /^\>|\+|~$/,
 			'attr': /^\[\w+(?:[\$\*\^!\|~]?=["']?.+["']?)?\]$/,  
-			'changer': /^:(?:eq|gt|lt|first|last|odd|even)(?:\(\d+\))?$/,
+			'changer': /^:(?:eq|gt|lt|first|last|odd|even|nth)(?:\(\d+\))?$/,
 			'pseudo' : /^:[\w\-]+(?:\(.+\))?$/,
 			'space' : /^\s+$/
 		};
@@ -51,11 +51,11 @@
 	};
 	
 	//check for QSA compatibility.
-	function QSA(selector) {
-		if(!document.querySelectorAll) return false;
+	function QSA(selector, context) {
+		if(!context.querySelectorAll) return false;
 		try {
-			document.querySelectorAll(selector);
-			return window.Element.prototype.querySelectorAll;
+			var x = context.querySelectorAll(selector);
+			return x;
 		}
 		catch(e) {
 			return false;	
@@ -78,11 +78,14 @@
 	};
 
 	var $avac = function(selector, context) {	
-		if(!selector || /^\s*$/.test(selector) || !selector.charAt) return;
+		if(!selector || /^\s*$/.test(selector) || !selector.charAt) return [];
 		selector = selector.replace(/^\s+|\s+$/, '').replace(/\s?([\+~\>])\s?/g, ' $1'); //trim
 		
 		var nodes = [document];
-		if(context && context.nodeType && context.nodeType == 1) nodes = [context];
+		if(context && context.nodeType && (context.nodeType == 1 || context.nodeType == 9)) nodes = [context];
+		
+		var x = QSA(selector, nodes[0]);
+		if( x != false ) return x;
 		
 		//will pull out any ID to use for speed. Will avoid ID's inside attribute values or :not|:contains etc.
 		var quickID = /.*(?!(?:\(|\[).*#.+(?:\)|\]))(?:[\w\d]+|\s)#([\w\d_-]+).*/g;
@@ -90,19 +93,11 @@
 			nodes = [ document.getElementById( selector.replace(quickID, '$1') ) ];
 			selector = selector.substr( quickID.lastIndex );
 		};
-
-		if( QSA(selector) ) // QSA compatibility check.
-			return arrayCallback(nodes, false, function(e) { 
-				return makeArray( e.querySelectorAll(selector) );
-			});
 		
 		var chunks = selectorSplit(selector)
 		,	i = 0
 		,	l = chunks.length
-		,	pieceStore = []
-		,	getters = $avac.getters
-		,	filters = $avac.filters
-		,	changers = $avac.changers;
+		,	pieceStore = [];
 		
 		chunks = arrayCallback(chunks, false, function(sel) {
 			return [ {text: sel, type: identify(sel)} ];
@@ -117,21 +112,22 @@
 				pieceStore.push( piece ); //push all pieces into pieceStore until we hit a space or the end.
 			}
 			else {
-				var piece1 = (piece.type != 'space' && piece.type != 'changer') ? piece : pieceStore.shift(); 				
+				if(piece.type != 'space' && piece.type != 'changer') pieceStore.push( piece );
+				var piece1 = pieceStore.shift();				
 				nodes = arrayCallback(nodes, false, function(el) {
-					return getters[ piece1.type ](el, piece1.text);
+					return $avac.getters[ piece1.type ](el, piece1.text);
 				});
 				
 				if(piece.type == 'changer') {
-					var value = piece.text.replace(/[^\(]+\((\d+)\)$/, '$1');
-					var type = piece.text.replace(/^:(\w+).*/, '$1');
-					nodes = changers[type](nodes, value);
+					var info = piece.text.match(/^:\w+|\s*['"]?(\d+)['"]?\s*?/g);
+					alert(info);
+					nodes = $avac.changers[ info[0] ](nodes, info[1]);
 				};
 				
 				if(pieceStore.length) {
 					for( var j = 0, k = pieceStore.length; j<k; j++ ) {
 						nodes = arrayCallback(nodes, true, function(node) {
-							return filters[ pieceStore[j].type ](node, pieceStore[j].text);
+							return $avac.filters[ pieceStore[j].type ](node, pieceStore[j].text);
 						});
 					}
 					j = 0;
@@ -139,7 +135,6 @@
 				pieceStore = [];
 			}
 		};
-
 		return nodes;
 	}
 	
@@ -229,7 +224,7 @@
 			return false;
 		},	
 		'pseudo' : function(elem, sel) {
-			var info = sel.match(/^:([\w-]+)|\(\s*['"]?(.*)['"]?\s*\)?/g);
+			var info = sel.match(/^:([\w-]+)|\s*['"]?[^\(\)]+['"]?\s*?/g);
 			return $avac.pseudo_filter[info[0].substr(1)](elem, info[1]);
 		}
 	};
@@ -273,21 +268,25 @@
 		'checked' : function(elem, sel) { return elem.checked },
 		'parent' : function(elem, sel) { return elem.hasChildNodes() }
 	};
+	
+	function ofType(arr, start, increment) {
+		var i = start, ret = [], e;
+		while( e = arr[ i ] ) {
+			ret.push( e );
+			i = i + increment;
+		}
+		return ret;
+	};
 		
 	$avac.changers = {
-		'eq' : function(arr, digit) { return [ arr[parseInt(digit)] ] },
-		'gt' : function(arr, digit) { return arr.slice(parseInt(digit)) },
-		'lt' : function(arr, digit) { return arr.slice(0, parseInt(digit)) },
-		'first' : function(arr, digit) { return [ arr[0] ] },
-		'last' : function(arr, digit) { return [ arr[a.length-1] ] },
-		'odd' : function(arr, digit, even) {
-			for(var i = even ? 0 : 1, l = arr.length, ret = []; i<l; i++) {
-				ret.push( arr[i] );
-				i++;
-			}
-			return ret;
-		},
-		'even' : function(arr, digit) { return this['odd'](arr, digit, true); }
+		':eq' : function(arr, digit) { return [ arr[parseInt(digit)] ] },
+		':gt' : function(arr, digit) { return arr.slice(parseInt(digit)) },
+		':lt' : function(arr, digit) { return arr.slice(0, parseInt(digit)) },
+		':first' : function(arr, digit) { return [ arr[0] ] },
+		':last' : function(arr, digit) { return [ arr[arr.length-1] ] },
+		':odd' : function(arr, digit, even) { return ofType(arr, 0, 2); },
+		':even' : function(arr, digit) { return ofType(arr, 1, 2); },
+		':nth' : function(arr, digit) { return ofType(arr, parseInt( digit ) -1, parseInt(digit) ); }
 	};
 	
 	$avac.self = $avac;
@@ -306,6 +305,7 @@
 		}
 		return true;
 	};
+	
 	window.$avac = $avac;
 
 })();
