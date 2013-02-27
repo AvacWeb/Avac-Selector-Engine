@@ -76,8 +76,6 @@ Selects all elements of type 'radio'
 Selects all checkbox/radio elements which are checked.
 * __header__
 Selects all elements which are a header element. h1, h2 etc...
-* __parent__
-Selects all elements which are a parent element. Aka, not empty.
 
 #### Pseudo which change the current set
 * __eq( n )___
@@ -88,16 +86,15 @@ Selects all elements at an index greater than n.
 Eg `$avac('div:gt(2)');` Will return the 3rd div and onwards.
 * __lt( n )__    
 Selects all elements at an index less than n. 
-Eg `$avac('div:gt(2)');` Will return the 3rd div and all before.
+Eg `$avac('div:lt(2)');` Will return the 3rd div and all before.
 * __first__ 
 Selects the first matching element. Same as :eq(0)
 * __last__    
-Selects the last matching element. Eg `$avac('div:last')` returns the last div.
+Selects the last matching element. Eg `$avac('div:last')` .
 * __odd__ 
-This selects all elements at an odd index. Meaning this may cause confusion due to being zero based. odd, will return the 2nd, 4th, 6th etc... (indexes 1, 3, 5)
+This selects all elements at an odd index. 
 * __even__
-This is the opposite of odd. Returning the 1st, 3rd, 5th etc.. (indexes 0, 2, 4)
-These can be swapped around if requested... let me know what you think.
+This is the opposite of odd obviously.
 
 
 Context Parameter     
