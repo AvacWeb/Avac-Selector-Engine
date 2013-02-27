@@ -1,169 +1,169 @@
-/* 
-* Avac CSS Selector Engine. 
-* Created by LGforum @ AvacWeb (avacweb.com)
-* AvacWeb Copyright 2011-2012
-* All Right Reserved.
-* No unauthorized distrubution or copying.
-*/
+/**
+ * Avac Selector Engine
+ * CSS3 selector engine.
+ *
+ * Copyright 2011-2013 AvacWeb (avacweb.com)
+ * Released under the MIT and GPL Licenses.
+ */
 (function(){
-	if (![].indexOf) {
-		Array.prototype.indexOf = function(obj) {
-			for (var i = 0, l = this.length; i < l; i++) if (this[i] === obj) return i;
-			return -1;
-		};
-	}
-	
-	var makeArray //fix for IE slice bugs.
 	try {
-		Array.prototype.slice.call(document.getElementsByTagName('html'));
-		makeArray = function(item){ return Array.prototype.slice.call(item) };
+		var makeArray = function(item) { return Array.prototype.slice.call(item) };
+		makeArray(document.getElementsByTagName('head')); //if this works with no error we can use this makeArray
     } 
 	catch(e) {
-        makeArray = function(item){
+        var makeArray = function(item) {
             if(item instanceof Object) return Array.prototype.slice.call(item);
-            for(l=item.length, ret = [], i = 0; i<l; i++) ret.push(item[i]);
-            return ret;
+            return arrayCallback(item, 'r', function(e) { 
+				return e; 
+			});
         };
     };
 	
 	//split the selector into a manageable array. 
 	function selectorSplit(selector) {
-		var chunky = /(?:#[\w\d_-]+)|(?:\.[\w\d_-]+)|(?:\[\w+(?:[\$\*\^!\|~=]?=["']?.+["']?)?\])|(?:[\>\+~])|\w+|\s|(?::[\w-]+(?:\([^\)]+\))?)/g
+		var chunky = /(?:#[\w\d_-]+)|(?:\.[\w\d_-]+)|(?:\[\w+(?:[\$\*\^!\|~=]?=["']?.+["']?)?\])|(?:[\>\+~])|\w+|\s|(?::[\w-]+(?:\([^\)]+\))?)/g;
 		return selector.match( chunky ) || [];
 	};
 	
 	//identify a chunk. Is it a class/id/tag etc?
 	function identify(chunk) {
-		var possibles = {
-			'id': /^#[^\>\+\.\s\[:~]+$/,
-			'class': /^\.[^\>\+\.\s\[:\(~]+$/,
-			'tag': /^[^\>\+\.\s\[:="'\(~]+$/,
-			'rel': /^\>|\+|~$/,
-			'attr': /^\[\w+(?:[\$\*\^!\|~]?=["']?.+["']?)?\]$/,  
-			'changer': /^:(?:eq|gt|lt|first|last|odd|even|nth)(?:\(\d+\))?$/,
-			'pseudo' : /^:[\w\-]+(?:\(.+\))?$/,
-			'space' : /^\s+$/
-		};
-		for(var type in possibles) {
-			if (possibles[type].test(chunk)) return type;
+		for(var type in $avac.regex) {
+			if ( $avac.regex[type].test(chunk) ) return type;
 		}
 		return false;
 	};
 	
-	//check for QSA compatibility.
-	function QSA(selector, context) {
-		if(!context.querySelectorAll) return false;
-		try {
-			var x = context.querySelectorAll(selector);
-			return x;
-		}
-		catch(e) {
-			return false;	
-		}
-	};
-	
-	//If filter = true, acts as a filter. else acts as a "getter"
-	function arrayCallback(nodes, filter, fn) {
-		for(var i = 0, ret = [], l = nodes.length; i<l; i++ ) {
-			var e = nodes[i];
-			var result = fn( e );
-			if(filter) {
-				if(result) ret.push( e );
-			}
-			else {
-				ret = ret.concat( result );
+	function arrayCallback(nodes, mode, fn) {
+		for(var i = 0, ret = [], l = nodes.length; i < l; i++ ) {
+			var e = nodes[i], result = fn( e );
+			switch(mode) {
+				case 'f' :
+					if(result) ret.push(e);
+					break;
+				case 'm' : 
+					ret = ret.concat( result );
+					break;
+				case 'r' :
+					ret.push( result );
 			}
 		};
 		return ret;
 	};
 
 	var $avac = function(selector, context) {	
-		if(!selector || /^\s*$/.test(selector) || !selector.charAt) return [];
-		selector = selector.replace(/^\s+|\s+$/, '').replace(/\s?([\+~\>])\s?/g, ' $1'); //trim
+		if(!selector || $avac.regex.space.test(selector) || !selector.charAt) return [];
+		selector = selector.replace(/^\s+|\s+$/, '').replace(/\s?([\+~\>])\s?/g, ' $1');
+		var nodes = context && context.push ? context : [document]
+		, quickID = /.*(?!(?:\(|\[).*#.+(?:\)|\]))(?:[\w\d]+|\s)#([\w\d_-]+).*/g
+		, i = 0
+		, pieceStore = [];
 		
-		var nodes = [document];
 		if(context && context.nodeType && (context.nodeType == 1 || context.nodeType == 9)) nodes = [context];
 		
-		var x = QSA(selector, nodes[0]);
-		if( x != false ) return x;
+		//this pulls out an ID to jump to n queries like: 'div.content span #foo .bar'
+		//jumps to #foo .bar - this may mean the result is not necessarily true, but would be much faster.
+		//if(quickID.test(selector)) {
+		//	nodes = [ document.getElementById( selector.replace(quickID, '$1') ) ];
+		//	selector = selector.substr( quickID.lastIndex );
+		//};
 		
-		//will pull out any ID to use for speed. Will avoid ID's inside attribute values or :not|:contains etc.
-		var quickID = /.*(?!(?:\(|\[).*#.+(?:\)|\]))(?:[\w\d]+|\s)#([\w\d_-]+).*/g;
-		if(quickID.test(selector)) {
-			nodes = [ document.getElementById( selector.replace(quickID, '$1') ) ];
-			selector = selector.substr( quickID.lastIndex );
-		};
-		
-		var chunks = selectorSplit(selector)
-		,	i = 0
-		,	l = chunks.length
-		,	pieceStore = [];
-		
-		chunks = arrayCallback(chunks, false, function(sel) {
-			return [ {text: sel, type: identify(sel)} ];
+		var chunks = arrayCallback( selectorSplit(selector), 'r', function(sel) {
+			return {
+				text: sel, 
+				type: identify(sel)
+			};
 		});
 		
-		for(; i<l; i++) {
+		for(var l = chunks.length; i < l; i++) {
 			if(nodes.length == 0) return []; //no point carrying on if we run out of nodes.
-			var piece = chunks[i], nextPiece = chunks[i+1];
-			if(!piece.type) throw new Error('Invalid Selector: '+piece.text);
+			
+			var piece = chunks[i], nextPiece = chunks[ i + 1 ];
+			if(!piece.type) throw new Error('Invalid Selector: ' + piece.text);
 
 			if(piece.type != 'space' && nextPiece) {
 				pieceStore.push( piece ); //push all pieces into pieceStore until we hit a space or the end.
 			}
 			else {
 				if(piece.type != 'space' && piece.type != 'changer') pieceStore.push( piece );
-				var piece1 = pieceStore.shift();				
-				nodes = arrayCallback(nodes, false, function(el) {
-					return $avac.getters[ piece1.type ](el, piece1.text);
-				});
+				
+				var piece1 = pieceStore.shift();	
+				if(piece1) {
+					nodes = arrayCallback(nodes, 'm', function(el) {
+						return el ? $avac.getters[ piece1.type ](el, piece1.text) : [];
+					});
+				}
+				
+				for(var j = 0, k = pieceStore.length; j < k; j++ ) {
+					if(pieceStore[j].type === 'changer') {
+						var info = $avac.regex.changer.exec(pieceStore[j].text);
+						nodes = $avac.changers[ info[1] ](nodes, parseInt(info[2]));
+						continue;
+					}
+					nodes = arrayCallback(nodes, 'f', function(e) {
+						return e ? $avac.filters[ pieceStore[j].type ](e, pieceStore[j].text) : false;
+					});
+				};
 				
 				if(piece.type == 'changer') {
-					var info = piece.text.match(/^:\w+|\s*['"]?(\d+)['"]?\s*?/g);
-					nodes = $avac.changers[ info[0] ](nodes, info[1]);
+					var info = $avac.regex.changer.exec(piece.text);
+					nodes = $avac.changers[ info[1] ](nodes, parseInt(info[2]));
 				};
 				
-				if(pieceStore.length) {
-					for( var j = 0, k = pieceStore.length; j<k; j++ ) {
-						nodes = arrayCallback(nodes, true, function(node) {
-							return $avac.filters[ pieceStore[j].type ](node, pieceStore[j].text);
-						});
-					}
-					j = 0;
-				};
 				pieceStore = [];
 			}
 		};
 		return nodes;
 	}
 	
+	$avac.regex = {
+		'id': /^#[\w\d-]+$/,
+		'Class': /^\.[\w\d-]+$/,
+		'tag': /^\w+$/,
+		'rel': /^\>|\+|~$/,
+		'attr': /^\[(\w+(?:-\w+)?)(?:([\$\*\^!\|~]?=)(.+?))?\]$/,  
+		'changer': /^:(eq|gt|lt|first|last|odd|even|nth)(?:\((\d+)\))?$/,
+		'pseudo' : /^:([\w\-]+)(?:\((.+?)\))?$/,
+		'space' : /^\s+$/
+	}
+	
 	$avac.getters = { 
 		'id' : function(elem, sel) {
-			return elem.getElementById ? [elem.getElementById(sel.substr(1))] : [document.getElementById(sel.substr(1))];
+			sel = sel.substr(1);
+			return elem.getElementById ? [elem.getElementById(sel)] : [document.getElementById(sel)];
 		},
-		'class': function(elem, sel) {
+		'Class': function(elem, sel) {
 			return elem.getElementsByClassName ? makeArray( elem.getElementsByClassName(sel.substr(1)) ) :
-			arrayCallback( elem.all ? elem.all : elem.getElementsByTagName('*'), true, function(e) {
-				return $avac.filters['class'](e, sel);
+			arrayCallback( elem.all ? elem.all : elem.getElementsByTagName('*'), 'f', function(e) {
+				return $avac.filters.Class(e, sel);
 			});
 		},
 		'tag': function(elem, sel) {
 			return makeArray( elem.getElementsByTagName(sel) );
 		},	
 		'attr': function(elem, sel) {
-			return arrayCallback( elem.all ? elem.all : elem.getElementsByTagName('*'), true, function(e) {
-				return $avac.filters['attr'](e, sel);
+			return arrayCallback( elem.all ? elem.all : elem.getElementsByTagName('*'), 'f', function(e) {
+				return $avac.filters.attr(e, sel);
 			});
 		},
 		'rel': function(elem, sel) {
-			if(/\+|~/.test(sel)) elem = elem.parentNode;
-			return arrayCallback(elem.childNodes, true, function(e) {
-				return $avac.filters['rel'](e, sel);
-			});
+			switch(sel) {
+				case '+' : 
+					var next = elem.nextElementSibling || elem.nextSibling;
+					while(next && next.nodeType !== 1) next = next.nextSibling;
+					return [next];
+				case '>' :
+					return arrayCallback(elem.childNodes, 'f', function(e) {
+						return e.nodeType === 1;
+					});
+				case '~' :
+					return arrayCallback(elem.parentNode.childNodes, 'f', function(e) {
+						return $avac.filters.rel(e, '~', elem);
+					});
+			}
 		},	
 		'pseudo': function(elem, sel) {
-			return arrayCallback(elem.all ? elem.all : elem.getElementsByTagName('*'), true, function(e) {
-				return $avac.filters['pseudo'](e, sel);
+			return arrayCallback(elem.all ? elem.all : elem.getElementsByTagName('*'), 'f', function(e) {
+				return $avac.filters.pseudo(e, sel);
 			});
 		}
 	};
@@ -172,59 +172,56 @@
 		'id' : function(elem, sel) {
 			return (elem.id && elem.id === sel.substr(1));
 		},	
-		'class' : function(elem, sel) {
-			return (elem.className && (RegExp('(^|\\s)'+sel.substr(1)+'(\\s|$)')).test( elem.className ));
+		'Class' : function(elem, sel) {
+			return (elem.className && (RegExp('(^|\\s)' + sel.substr(1) + '(\\s|$)')).test( elem.className ));
 		},	
 		'tag' : function(elem, sel) {
 			return (elem.tagName && elem.tagName.toLowerCase() === sel.toLowerCase());
 		},	
-		'attr' : function(elem, sel) {
-			sel = sel.replace(/^\[|\]$/g, '');
-			var info = sel.match(/(?:[^\|\^\*\$!~=]+)|(?:[\|\^\*\$!~=]?=)|(?:['"]?.+['"]?$)/g);
-			if(info[2]) info[2] = info[2].replace(/^['"]|['"]$/g, '');
-
-			var attrvalue = elem.getAttribute ? elem.getAttribute(info[0]) : elem.attributes.getNamedItem(info[0]);
-			if(!info[1] || !attrvalue) return (attrvalue);
-				
-			switch(info[1]) {
-				case '==':
-				case '=':
-					return (attrvalue === info[2])
-				case '^=':
-				case '|=':
-					return (attrvalue.indexOf( info[2] ) === 0);
-				case '$=':
-					return (RegExp(info[2]+'$')).test(attrvalue);
-				case '*=':
-				case '~=':
-					return (attrvalue.indexOf( info[2] ) != -1)
-				case '!=':
-					return (attrvalue != info[2])
-			};
+		'attr' : function(elem, sel) {  
+			var info = $avac.regex.attr.exec(sel);
+			var attr = elem.getAttribute ? elem.getAttribute(info[1]) : elem.attributes.getNamedItem(info[1]);
+			if( !info[2] || !attr ) return !!attr;
+			
+			if(info[2] && info[3]) {
+				var value = info[3].replace(/^['"]|['"]$/g, '');
+				switch(info[2]) {
+					case '==':
+					case '=':
+						return (attr === value)
+					case '^=':
+					case '|=':
+						return (attr.indexOf(value) === 0);
+					case '$=':
+						return (RegExp(value + '$')).test(attr);
+					case '*=':
+						return (attr.indexOf(value) != -1)
+					case '~=':
+						return attr.match(RegExp('\\b' + value + '\\b'));
+					case '!=':
+						return (attr != value)
+				}
+			}
 			return false;
 		},	
-		'rel' : function(elem, sel) {
+		'rel' : function(elem, sel, relElem) {
 			switch(sel) {
 				case '+' : 
 					var prev = elem.previousElementSibling || elem.previousSibling;
 					while(prev && prev.nodeType != 1) {
 						prev = prev.previousSibling;
 					}
-					return (nodes.indexOf(prev) != -1);
+					return prev === relElem;
 				case '~' :
-					while(elem = elem.previousSibling) {
-						if( nodes.indexOf( elem ) != -1 ) return true;
-					}
-					return false;
+					return elem !== relElem && elem.parentNode === relElem.parentNode;
 				case '>' :
-					var parent = elem.parentElement || elem.parentNode;
-					return (nodes.indexOf(parent) != -1);
+					return elem.parentNode === relElem;
 			};
 			return false;
 		},	
 		'pseudo' : function(elem, sel) {
-			var info = sel.match(/^:([\w-]+)|\s*['"]?[^\(\)]+['"]?\s*?/g);
-			return $avac.pseudo_filter[info[0].substr(1)](elem, info[1]);
+			var pseudo = sel.replace($avac.regex.pseudo, '$1'), info = sel.replace($avac.regex.pseudo, '$2')
+			return $avac.pseudo_filter[pseudo](elem, info);
 		}
 	};
 		
@@ -246,17 +243,17 @@
 			return elem.type === 'hidden' || (s && s.display === "none") || (s && s.visibility === 'hidden')
 		},
 		'contains' : function(elem, sel) { 
-			var text = elem.textContent || elem.innerText || elem.innerHTML.replace(/\<\/?[^\>]+>/g, '');
-			return (text.indexOf(sel) != -1 )
+			var text = elem.textContent || elem.innerText || elem.innerHTML.replace(/<.*?>/g, '');
+			return (text.indexOf(sel) != -1)
 		},
-		'notcontains' : function(elem, sel) { return !this['contains'](elem, sel) },
+		'notcontains' : function(elem, sel) { return !this.contains(elem, sel) },
 		'only-child' : function(elem, sel) { return ( this['first-child'](elem) && this['last-child'](elem) ) },
 		'empty' : function(elem, sel) { return !elem.hasChildNodes() },
-		'not' : function(elem, sel) { return ( $avac.self(sel, elem.parentNode).indexOf(elem) == -1 ) },
-		'has' : function(elem, sel) { return ( $avac.self(sel, elem).length > 0 ) },
-		'nothas' : function(elem, sel) { return !this['has'](elem, sel) },
+		'not' : function(elem, sel) { return $avac(sel).indexOf(elem) == -1 },
+		'has' : function(elem, sel) { return $avac(sel, elem).length > 0 },
+		'nothas' : function(elem, sel) { return !this.has(elem, sel) },
 		'selected' : function(elem, sel) { return elem.selected; },
-		'visible' : function(elem, sel) { return !this['hidden'](elem) },
+		'visible' : function(elem, sel) { return !this.hidden(elem) },
 		'input' : function(elem, sel) { return (/input|select|textarea|button/i).test( elem.nodeName ) },
 		'enabled' : function(elem, sel) { return !elem.disabled },
 		'disabled' : function(elem, sel) { return elem.disabled },
@@ -264,47 +261,39 @@
 		'text' : function(elem, sel) { return elem.type === 'text' },
 		'header' : function(elem, sel) { return (/h\d/i).test( elem.nodeName ) },
 		'radio' : function(elem, sel) { return elem.type === 'radio' },
-		'checked' : function(elem, sel) { return elem.checked },
-		'parent' : function(elem, sel) { return elem.hasChildNodes() }
+		'checked' : function(elem, sel) { return elem.checked }
 	};
 	
 	function ofType(arr, start, increment) {
 		var i = start, ret = [], e;
-		while( e = arr[ i ] ) {
+		while( e = arr[i] ) {
 			ret.push( e );
-			i = i + increment;
+			i += increment;
 		}
 		return ret;
 	};
 		
 	$avac.changers = {
-		':eq' : function(arr, digit) { return [ arr[parseInt(digit)] ] },
-		':gt' : function(arr, digit) { return arr.slice(parseInt(digit)) },
-		':lt' : function(arr, digit) { return arr.slice(0, parseInt(digit)) },
-		':first' : function(arr, digit) { return [ arr[0] ] },
-		':last' : function(arr, digit) { return [ arr[arr.length-1] ] },
-		':odd' : function(arr, digit, even) { return ofType(arr, 0, 2); },
-		':even' : function(arr, digit) { return ofType(arr, 1, 2); },
-		':nth' : function(arr, digit) { return ofType(arr, parseInt( digit ) -1, parseInt(digit) ); }
+		'eq' : function(arr, digit) { return arr[digit] ? [ arr[digit] ] : []; },
+		'gt' : function(arr, digit) { return arr.slice(digit) },
+		'lt' : function(arr, digit) { return arr.slice(0, digit) },
+		'first' : function(arr, digit) { return [ arr[0] ] },
+		'last' : function(arr, digit) { return [ arr[arr.length-1] ] },
+		'odd' : function(arr, digit) { return ofType(arr, 0, 2); },
+		'even' : function(arr, digit) { return ofType(arr, 1, 2); },
+		'nth' : function(arr, digit) { return ofType(arr, digit - 1, digit); }
 	};
 	
-	$avac.self = $avac;
-	$avac.filter = function(nodes, filter) {
-		var type = identify( filter );
-		return arrayCallback(nodes, true, function(e) {
-			return $avac.filters[type](e, filter);
-		});
-	};
-	
-	$avac.match = function(node, sel) {
-		var chunks = selectorSplit( sel );
-		for(var i = 0, l = chunks.length; i<l; i++ ) {
-			var type = identify(chunks[i]);
-			if( !$avac.filters[type](node, chunks[i]) ) return false;
+	if(document.querySelectorAll) {
+		window.$avac = function(s, c) {
+			c = c && c.push ? c : [document];
+			return arrayCallback(c, 'm', function(e) {
+				return makeArray( e.querySelectorAll(s) );
+			});
 		}
-		return true;
-	};
-	
-	window.$avac = $avac;
+	}
+	else {
+		window.$avac = $avac;
+	}
 
 })();
