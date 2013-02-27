@@ -9,15 +9,15 @@
 	try {
 		var makeArray = function(item) { return Array.prototype.slice.call(item) };
 		makeArray(document.getElementsByTagName('head')); //if this works with no error we can use this makeArray
-    } 
+	} 
 	catch(e) {
-        var makeArray = function(item) {
-            if(item instanceof Object) return Array.prototype.slice.call(item);
-            return arrayCallback(item, 'r', function(e) { 
+		var makeArray = function(item) {
+			if(item instanceof Object) return Array.prototype.slice.call(item);
+			return arrayCallback(item, 'r', function(e) { 
 				return e; 
 			});
-        };
-    };
+		};
+	};
 	
 	//split the selector into a manageable array. 
 	function selectorSplit(selector) {
@@ -49,16 +49,23 @@
 		};
 		return ret;
 	};
-
+	
+	function fix_context(item) {
+		if(item.length) {
+			if(item.push) return item;
+			return makeArray(item);
+		}
+		if(item.nodeType == 1) return [item];
+		return [document];
+	};
+	
 	var $avac = function(selector, context) {	
 		if(!selector || $avac.regex.space.test(selector) || !selector.charAt) return [];
 		selector = selector.replace(/^\s+|\s+$/, '').replace(/\s?([\+~\>])\s?/g, ' $1');
-		var nodes = context && context.push ? context : [document]
+		var nodes = context ? fix_context(context) : [document]
 		, quickID = /.*(?!(?:\(|\[).*#.+(?:\)|\]))(?:[\w\d]+|\s)#([\w\d_-]+).*/g
 		, i = 0
 		, pieceStore = [];
-		
-		if(context && context.nodeType && (context.nodeType == 1 || context.nodeType == 9)) nodes = [context];
 		
 		//this pulls out an ID to jump to n queries like: 'div.content span #foo .bar'
 		//jumps to #foo .bar - this may mean the result is not necessarily true, but would be much faster.
@@ -286,7 +293,7 @@
 	
 	if(document.querySelectorAll) {
 		window.$avac = function(s, c) {
-			c = c && c.push ? c : [document];
+			c = c ? fix_context(c) : [document];
 			return arrayCallback(c, 'm', function(e) {
 				return makeArray( e.querySelectorAll(s) );
 			});
