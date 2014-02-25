@@ -1,8 +1,9 @@
 Avac Selector Engine 
 ===============================
-According to Closure-Compiler: Size = 9KB, Compiled size = 5KB. Woop!
+Original Size:	3.61KB gzipped (10.45KB uncompressed)
+Compiled Size:	2.07KB gzipped (5.44KB uncompressed)
 
-This is basically the same as the rest of them, a CSS Selector Engine, but its also very fast and lightweight. It has an abundance of helpful pseudo's, but I dislike all of the silly '-of-type' or 'nth' selectors, maybe will be added in the future. See further down for selectors.
+This is basically the same as the rest of them, a CSS3 Selector Engine, but its also very fast and lightweight. It has an abundance of helpful pseudo's, but I dislike all of the silly '-of-type' or 'nth' selectors, maybe will be added in the future. See further down for selectors.
 
 ```javascript
 $avac('div.className > [href]');
@@ -25,8 +26,20 @@ Eg `$avac('a[rel]')` Selects all a tags with a rel attribute.
 Specifying a value is optional too:
 `$avac('a[rel=nofollow]')` Selects all a tags with a rel attribue of 'nofollow'.   
 
-The conditional statement can also take on these roles: *=,~=,^=,|=,$=,!=,== 
+The conditional statement can also take on these roles: *=,~=,^=,|=,$=,!=,==
 All talked about in the link above. != means not equals obviously.    
+
+#### Regex Attribute Selectors
+This is new and experimental, but I've added the ability to match attributes with a regexp.
+
+It looks as follows:
+```javascript
+$avac('div[id/=^content]')
+```
+This matches all div's that have an ID attribute matching the regexp `/^content/`
+
+To add modifiers to the regex, seperate them with a space at the end: `$avac('div[id/=^content i]')`
+Now its case-insensitive.
 
 #### Relative Selectors.
 * The next sibling selector: '+'  `$avac('div + p');`   
@@ -77,8 +90,8 @@ Selects all checkbox/radio elements which are checked.
 * __header__
 Selects all elements which are a header element. h1, h2 etc...
 
-#### Pseudo which change the current set
-* __eq( n )___
+#### Pseudos which change the current set
+* __eq( n )__
 Chooses the nth matching element. Eg `$avac('div:eq(1)');` Matches the second div.
 This is useful for when you want to continue the search.
 * __gt( n )__    
@@ -87,6 +100,9 @@ Eg `$avac('div:gt(2)');` Will return the 3rd div and onwards.
 * __lt( n )__    
 Selects all elements at an index less than n. 
 Eg `$avac('div:lt(2)');` Will return the 3rd div and all before.
+* __nth( n )__
+Selects every nth element.
+Eg `$avac('div:nth(3)');` will select the 3rd, 6th, 9th divs and so on.
 * __first__ 
 Selects the first matching element. Same as :eq(0)
 * __last__    
@@ -99,21 +115,47 @@ This is the opposite of odd obviously.
 
 Context Parameter     
 ----------------------------
-A second parameter (context) is accepted... obviously. It should be an element node only.  `$avac('div.content', document.getElementById('main'))`
+A second parameter (context) is accepted... obviously.
+It can be an element node, nodelist or an array of nodes. It is 'document' by default.
+
+`$avac('div.content', document.getElementById('main'))`
+`$avac('a[href]', $avac('div.content'));`
 
 
-Additional Usage.     
+Adding Custom Pseudo selectors.  
 ------------------------------
-* __$avac.match(node, selector)__
-This function can be used to determine if a node matches a selector. 
+Avac Selector Engine can have more pesudo filters added to it using the `$avac.add_pseudo(name, func)` method.
 
-* __$avac.filter(nodes, filter)__
-This function can be used to filter an array (or html collection) of nodes. The filter parameter should be only a simple selector aka just one part. Eg '.class', '#id', '[attr=value]', and not be something like 'div.class p'. 
-Eg `$avac.filter( document.getElementsByTagName('div'), '.inner');` Will filter all the divs, and return only those matching '.inner'. 
+#### Parameters
+* __name__
+The name of your pseudo. Don't include a colon. 
+
+* __func__
+The function should act as filter returning true or false if the element matches the pseudo conditions. 
+It receives 2 arguments, a node to filter and any value specified for the pseudo (inbetween brackets). 
+
+#### Example usage
+```javascript
+$avac.add_pseudo('external', function(elem, attr) {
+	var val = elem.getAttribute(attr);
+	return (val && /^http/.test(val));
+});
+
+$avac('a:external(href)'); //returns all external links
+$avac('img:external(src)'); //returns all images hosted externally.
+
+$avac.add_pseudo('src-has', function(elem, value) {
+	return elem.src && elem.src.indexOf(value) != -1);
+});
+
+$avac('div img:src-has(thumb)'); //returns all images with 'thumb' in the src. 
+```
+Easy.
+
 
 Other notes I'd like to make 
 ------------------------------------    
 * querySelectorAll is supported if the browser supports it and the selector string can be handled by QSA.
 * The selector engine supports a range of browsers but not as much as the likes of Sizzle. Any suggestions or improvements for browser support would be good. It will support IE7+ However I did not check any earlier. 
-* Will I ever offer an API for adding more pseudo's or selectors? Probably not. If you need to add more, your doing something wrong IMO.
 * Bug reports/improvements are more than welcome. 
+* There is a shortcut for speed in the script available. Look through for the big comment. 
